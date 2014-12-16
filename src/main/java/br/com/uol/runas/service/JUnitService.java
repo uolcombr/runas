@@ -31,7 +31,7 @@ import br.com.uol.runas.factory.ThreadFactoryImpl;
 @Service
 public class JUnitService {
 
-	public Result scan(String path, final String[] suits) throws Exception {
+	public Result runTests(String path, final String[] suits) throws Exception {
 
 		URL[] url = new URL[] {new File(path).toURI().toURL()};
 		final ClassLoader classLoader = URLClassLoader.newInstance(url);

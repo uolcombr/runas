@@ -15,7 +15,12 @@
  */
 package br.com.uol.runas.controller;
 
+import static org.apache.commons.lang3.StringUtils.substringBetween;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,16 +30,29 @@ import br.com.uol.runas.service.JUnitService;
 @RestController
 public class JUnitController {
 
-	@Autowired
-	private JUnitService jUnitService;
+    @Autowired
+    private JUnitService jUnitService;
 
-	@RequestMapping("/junit")
-	public String run(@RequestParam("path") String path, @RequestParam("suits") String[] suits) throws Exception {
+    @RequestMapping("/junit/**/{pack:(?:.+\\.[jwe]ar)}/{suites:(?:.+\\.)+[_A-Z]+}")
+    public String runPackage(HttpServletRequest request,
+            @PathVariable("pack") String pack,
+            @PathVariable("suites") String[] suites,
+            @RequestParam(required=false, value="retries") Integer retries,
+            @RequestParam(required=false, value="interval") Integer interval) throws Exception {
 
-		jUnitService.scan(path, suits);
+        final String path = substringBetween(request.getRequestURI(), "/junit/", pack);
 
-		return "Oi";
-	}
+        return String.valueOf(jUnitService.runTests(path, suites).wasSuccessful());
+    }
 
+    @RequestMapping("/junit/**/{dir:(?:.*(?!\\.[jwe]ar))}/{suites:(?:.+\\.)+[_A-Z]+}")
+    public String runDir(HttpServletRequest request,
+            @PathVariable("suites") String[] suites,
+            @RequestParam(required=false, value="retries") Integer retries,
+            @RequestParam(required=false, value="interval") Integer interval) throws Exception {
 
+        final String path = substringBetween(request.getRequestURI(), "/junit/", suites[0]);
+
+        return String.valueOf(jUnitService.runTests(path, suites).wasSuccessful());
+    }
 }
