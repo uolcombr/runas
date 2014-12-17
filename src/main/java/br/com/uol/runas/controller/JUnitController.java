@@ -47,7 +47,7 @@ public class JUnitController {
 
 		HttpStatus status;
 
-		if(response.getResult().wasSuccessful()){
+		if(response.getResult().wasSuccessful() && response.getResult().getIgnoreCount() == 0){
 			status = HttpStatus.OK;
 		}else if(response.getResult().getFailureCount() > 0){
 			status = HttpStatus.EXPECTATION_FAILED;
