@@ -16,38 +16,217 @@
 package br.com.uol.runas.service;
 
 import java.io.File;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 import org.junit.runner.Result;
+import org.junit.runners.Suite;
 import org.springframework.stereotype.Service;
 
 import br.com.uol.runas.callable.JUnitCallable;
 import br.com.uol.runas.factory.ThreadFactoryImpl;
+import br.com.uol.runas.service.enums.ContentType;
+import br.com.uol.runas.service.response.JUnitServiceResponse;
+import cucumber.api.CucumberOptions;
+import cucumber.api.SnippetType;
 
 @Service
 public class JUnitService {
 
-	public Result runTests(String path, final String[] suits) throws Exception {
+	private final String LOG_PATH_WITHOUT_EXTENSION = "/home/cad_asilva/test/testLog";
+	private Set<Class<?>> classesToChange;
+	private Set<ContentType> foundTypes;
+	private ContentType contentType;
+	private String logPath;
 
-		URL[] url = new URL[] {new File(path).toURI().toURL()};
+	public JUnitServiceResponse runTests(String path, final String[] suits) throws Exception {
+
+		final URL[] url = new URL[] {new File(path).toURI().toURL()};
 		final ClassLoader classLoader = URLClassLoader.newInstance(url);
-
-		ThreadFactory threadFactory = new ThreadFactoryImpl(classLoader);
-
-		ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
-
-		Class<?>[] classes = new Class[suits.length];
+		final ThreadFactory threadFactory = new ThreadFactoryImpl(classLoader);
+		final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
+		final Class<?>[] classes = new Class[suits.length];
 
 		for (int i = 0; i < suits.length; i++) {
 			classes[i] = classLoader.loadClass(suits[i]);
+			classesToChange = new HashSet<>();
+			foundTypes = new HashSet<>();
+			prepareClass(classes[i]);
 		}
 
-		Result result = service.submit(new JUnitCallable(classes)).get();
+		contentType = chooseContentType();
+		setLogPath();
+		alterClasses();
+		
+		final Result result = service.submit(new JUnitCallable(classes)).get();
+		
+		return new JUnitServiceResponse(contentType.getContentType(), new String(Files.readAllBytes(Paths.get(logPath))), result);
+	}
 
-		return result;
+	private void prepareClass(Class<?> clazz) throws Exception{
+
+		if(clazz.isAnnotationPresent(Suite.SuiteClasses.class)){
+
+			final Suite.SuiteClasses suiteClasses = (Suite.SuiteClasses) clazz.getAnnotation(Suite.SuiteClasses.class);
+
+			for(Class<?> c : suiteClasses.value()){
+
+				if(c.isAnnotationPresent(CucumberOptions.class)){
+					
+					CucumberOptions cucumberOptions = (CucumberOptions) c.getAnnotation(CucumberOptions.class);
+					if(cucumberOptions.format() != null){
+						classesToChange.add(c);	
+						appendFormats(cucumberOptions);
+					}	
+				}
+				prepareClass(c);
+			}
+		}
+	}
+
+	private void alterClasses() throws Exception{
+
+		Annotation newCucumberOptions;
+		for(Class<?> clazz : classesToChange){
+			newCucumberOptions = changeCucumberOptions((CucumberOptions) clazz.getAnnotation(CucumberOptions.class));
+			overrideCucumberOptions(newCucumberOptions, clazz);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private void overrideCucumberOptions(Annotation annotation, Class<?> clazz) throws Exception{
+		final Field field = Class.class.getDeclaredField("annotations");
+		field.setAccessible(true);
+		final Map<Class<? extends Annotation>, Annotation> annotations = (Map<Class<? extends Annotation>, Annotation>) field.get(clazz);
+		annotations.put(CucumberOptions.class, annotation);
+	}
+
+	private void appendFormats(CucumberOptions cucumberOptions){
+
+		final String[] oldFormats = cucumberOptions.format();
+		String[] extensions;
+
+		if(oldFormats != null){
+
+			for(int i = 0; i < oldFormats.length; i++){
+				extensions = oldFormats[i].split(":");
+				switch (extensions[0]) {
+
+				case "json":
+					foundTypes.add(ContentType.JSON);
+					break;
+
+				case "xml":
+					foundTypes.add(ContentType.XML);
+					break;
+
+				case "html":
+					foundTypes.add(ContentType.HTML);
+					break;
+
+				default:
+					break;
+				}
+			}
+		}
+	}
+
+	private Annotation changeCucumberOptions(CucumberOptions cucumberOptions){
+
+		return newCucumberOptions(cucumberOptions, new String[]{contentType.getExtension() + ":" + logPath});
+	}
+
+	private ContentType chooseContentType(){
+
+		if(foundTypes.contains(ContentType.JSON)){
+			return ContentType.JSON;
+		}
+
+		if(foundTypes.contains(ContentType.XML)){
+			return ContentType.XML;
+		}
+
+		if(foundTypes.contains(ContentType.HTML)){
+			return ContentType.HTML;
+		}
+
+		return ContentType.JSON;
+	}
+	
+	private void setLogPath(){
+		logPath = LOG_PATH_WITHOUT_EXTENSION + "." + contentType.getExtension();
+	}
+
+	private Annotation newCucumberOptions(final CucumberOptions oldCucumberOptions, final String[] newFormats) {
+
+		final Annotation newCucumberOptions = new CucumberOptions() {
+
+			@Override
+			public Class<? extends Annotation> annotationType() {
+				return oldCucumberOptions.annotationType();
+			}
+
+			@Override
+			public String[] tags() {
+				return oldCucumberOptions.tags();
+			}
+
+			@Override
+			public boolean strict() {
+				return oldCucumberOptions.strict();
+			}
+
+			@Override
+			public SnippetType snippets() {
+				return oldCucumberOptions.snippets();
+			}
+
+			@Override
+			public String[] name() {
+				return oldCucumberOptions.name();
+			}
+
+			@Override
+			public boolean monochrome() {
+				return oldCucumberOptions.monochrome();
+			}
+
+			@Override
+			public String[] glue() {
+				return oldCucumberOptions.glue();
+			}
+
+			@Override
+			public String[] format() {
+				return newFormats;
+			}
+
+			@Override
+			public String[] features() {
+				return oldCucumberOptions.features();
+			}
+
+			@Override
+			public boolean dryRun() {
+				return oldCucumberOptions.dryRun();
+			}
+
+			@Override
+			public String dotcucumber() {
+				return oldCucumberOptions.dotcucumber();
+			}
+		};
+
+		return newCucumberOptions;
 	}
 }
