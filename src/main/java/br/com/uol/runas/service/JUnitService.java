@@ -15,11 +15,8 @@
  */
 package br.com.uol.runas.service;
 
-import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashSet;
@@ -34,6 +31,7 @@ import org.junit.runners.Suite;
 import org.springframework.stereotype.Service;
 
 import br.com.uol.runas.callable.JUnitCallable;
+import br.com.uol.runas.factory.ClassLoaderFactory;
 import br.com.uol.runas.factory.ThreadFactoryImpl;
 import br.com.uol.runas.service.enums.ContentType;
 import br.com.uol.runas.service.response.JUnitServiceResponse;
@@ -51,14 +49,13 @@ public class JUnitService {
 
 	public JUnitServiceResponse runTests(String path, final String[] suits) throws Exception {
 
-		final URL[] url = new URL[] {new File(path).toURI().toURL()};
-		final ClassLoader classLoader = URLClassLoader.newInstance(url);
-		final ThreadFactory threadFactory = new ThreadFactoryImpl(classLoader);
+		final ClassLoader loader = ClassLoaderFactory.newClassLoader(path);
+		final ThreadFactory threadFactory = new ThreadFactoryImpl(loader);
 		final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
 		final Class<?>[] classes = new Class[suits.length];
 
 		for (int i = 0; i < suits.length; i++) {
-			classes[i] = classLoader.loadClass(suits[i]);
+			classes[i] = loader.loadClass(suits[i]);
 			classesToChange = new HashSet<>();
 			foundTypes = new HashSet<>();
 			prepareClass(classes[i]);

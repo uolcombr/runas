@@ -36,19 +36,17 @@ public class JUnitController {
 	@Autowired
 	private JUnitService jUnitService;
 
-	@RequestMapping("/junit/**/{pack:(?:.+\\.[jwe]ar)}/{suites:(?:.+\\.)+[_A-Z].+}")
-	public ResponseEntity<String> runPackage(HttpServletRequest request,
-			@PathVariable("pack") String pack,
+	@RequestMapping("/junit/**/{suites:(?:.+\\.)+[_A-Z].+}")
+	public ResponseEntity<String> runDir(HttpServletRequest request,
 			@PathVariable("suites") String[] suites,
 			@RequestParam(required=false, value="retries") Integer retries,
 			@RequestParam(required=false, value="interval") Integer interval) throws Exception {
+		final String path = substringBetween(request.getRequestURI(), "/junit", suites[0]);
 
-		final String path = substringBetween(request.getRequestURI(), "/junit", "/" + suites[0]);
-		
 		final JUnitServiceResponse response = jUnitService.runTests(path, suites);
-		
+
 		HttpStatus status;
-		
+
 		if(response.getResult().wasSuccessful()){
 			status = HttpStatus.OK;
 		}else if(response.getResult().getFailureCount() > 0){
@@ -56,19 +54,8 @@ public class JUnitController {
 		}else{
 			status = HttpStatus.PARTIAL_CONTENT;
 		}
-		
+
 		return ResponseEntity.status(status).contentType(response.getMediaType()).body(response.getLog());
 	}
 
-	@RequestMapping("/junit/**/{pack:(?:.*(?!\\.[jwe]ar))}/{suites:(?:.+\\.)+[_A-Z].+}")
-	public String runDir(HttpServletRequest request,
-			@PathVariable("suites") String[] suites,
-			@RequestParam(required=false, value="retries") Integer retries,
-			@RequestParam(required=false, value="interval") Integer interval) throws Exception {
-
-		final String path = substringBetween(request.getRequestURI(), "/junit", "/" + suites[0]);
-
-//		return String.valueOf(jUnitService.runTests(path, suites).wasSuccessful());
-		return null;
-	}
 }
