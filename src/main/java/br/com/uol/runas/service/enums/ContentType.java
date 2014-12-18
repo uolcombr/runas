@@ -19,7 +19,6 @@ import org.springframework.http.MediaType;
 
 public enum ContentType {
 	
-	XML("xml", MediaType.TEXT_XML),
 	JSON("json", MediaType.APPLICATION_JSON),
 	HTML("html", MediaType.TEXT_HTML);
 	
