@@ -15,17 +15,10 @@
  */
 package br.com.uol.runas.service;
 
-import gherkin.deps.com.google.gson.Gson;
-
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +27,7 @@ import java.util.concurrent.ThreadFactory;
 
 import org.junit.runner.Result;
 import org.junit.runners.Suite;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import br.com.uol.runas.callable.JUnitCallable;
@@ -60,27 +54,29 @@ public class JUnitService {
 		try(final URLClassLoader loader = new JarClassLoader(path)){
 			final ThreadFactory threadFactory = new ThreadFactoryImpl(loader);
 			final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
-			final Class<?>[] classes = new Class[suits.length];
-			classesToChange = new HashSet<>();
-			foundTypes = new HashSet<>();
-			logMap.clear();
-			for (int i = 0; i < suits.length; i++) {
-				classes[i] = loader.loadClass(suits[i]);
-				prepareClass(classes[i]);
-			}
+//			final Class<?>[] classes = new Class[suits.length];
+//			classesToChange = new HashSet<>();
+//			foundTypes = new HashSet<>();
+//			logMap.clear();
+//			for (int i = 0; i < suits.length; i++) {
+//				classes[i] = loader.loadClass(suits[i]);
+//				prepareClass(classes[i]);
+//			}
+//
+//			contentType = chooseContentType();
+//			setLogPath();
+//			alterClasses();
 
-			contentType = chooseContentType();
-			setLogPath();
-			alterClasses();
+			final Result result = service.submit(new JUnitCallable(suits)).get();
+			service.shutdownNow();
 
-			final Result result = service.submit(new JUnitCallable(classes)).get();
-
-			final List<Object> logs = new ArrayList<>();
-			for(String log : logMap.values()){
-				logs.addAll(new Gson().fromJson(new String(Files.readAllBytes(Paths.get(log))), List.class));
-			}
-
-			return new JUnitServiceResponse(contentType.getContentType(), new Gson().toJson(logs) , result);
+//			final List<Object> logs = new ArrayList<>();
+//			for(String log : logMap.values()){
+//				logs.addAll(new Gson().fromJson(new String(Files.readAllBytes(Paths.get(log))), List.class));
+//			}
+//
+//			return new JUnitServiceResponse(contentType.getContentType(), new Gson().toJson(logs) , result);
+			return new JUnitServiceResponse(MediaType.TEXT_PLAIN, "", result);
 		}
 	}
 

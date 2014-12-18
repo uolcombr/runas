@@ -47,8 +47,6 @@ public class JarClassLoader extends URLClassLoader {
     private void addUrlsFromPath(String path) throws IOException, URISyntaxException {
         final URL rootUrl = pathToUrl(path);
 
-        addURL(rootUrl);
-
         try {
             addUrlsFromJar(rootUrl);
         } catch (ClassCastException e) {
@@ -60,9 +58,10 @@ public class JarClassLoader extends URLClassLoader {
         final JarURLConnection jarConnection = (JarURLConnection) url.openConnection();
         final JarFile jar = jarConnection.getJarFile();
         final Enumeration<JarEntry> entries = jar.entries();
-        final String base = url.toString();
+        final URL jarUrl = new File(jar.getName()).toURI().toURL();
+        final String base = jarUrl.toString();
 
-        addURL(new File(jar.getName()).toURI().toURL());
+        addURL(jarUrl);
 
         while (entries.hasMoreElements()) {
             final JarEntry entry = entries.nextElement();
@@ -74,6 +73,8 @@ public class JarClassLoader extends URLClassLoader {
     }
 
     private void addUrlsFromDir(URL url) throws IOException, URISyntaxException {
+        addURL(url);
+
         Files.walkFileTree(Paths.get(url.toURI()), new FileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
