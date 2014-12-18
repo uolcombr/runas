@@ -45,6 +45,22 @@
 			<version>3.3.2</version>
 		</dependency>
 		<!-- Utils -->
+
+		<!-- jackson - xml -->
+		<dependency>
+			<groupId>com.fasterxml</groupId>
+			<artifactId>jackson-xml-databind</artifactId>
+			<version>0.6.2</version>
+		</dependency>
+		<!-- jackson - xml -->
+
+		<!-- HTML Builder -->
+		<dependency>
+			<groupId>com.hp.gagawa</groupId>
+			<artifactId>gagawa</artifactId>
+			<version>1.0.1</version>
+		</dependency>
+		<!-- HTML Builder -->
 	</dependencies>
 
 	<build>
