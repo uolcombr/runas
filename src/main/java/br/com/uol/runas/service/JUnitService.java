@@ -37,8 +37,8 @@ import org.junit.runners.Suite;
 import org.springframework.stereotype.Service;
 
 import br.com.uol.runas.callable.JUnitCallable;
-import br.com.uol.runas.factory.ClassLoaderFactory;
 import br.com.uol.runas.factory.ThreadFactoryImpl;
+import br.com.uol.runas.loader.JarClassLoader;
 import br.com.uol.runas.service.enums.ContentType;
 import br.com.uol.runas.service.response.JUnitServiceResponse;
 import cucumber.api.CucumberOptions;
@@ -51,13 +51,13 @@ public class JUnitService {
 	private Set<Class<?>> classesToChange;
 	private Set<ContentType> foundTypes;
 	private ContentType contentType;
-	
+
 	private final Map<Class<?>, String> logMap = new HashMap<Class<?>, String>();
 
 	@SuppressWarnings("unchecked")
 	public JUnitServiceResponse runTests(String path, final String[] suits) throws Exception {
 
-		try(final URLClassLoader loader = (URLClassLoader) ClassLoaderFactory.newClassLoader(path)){
+		try(final URLClassLoader loader = new JarClassLoader(path)){
 			final ThreadFactory threadFactory = new ThreadFactoryImpl(loader);
 			final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
 			final Class<?>[] classes = new Class[suits.length];
@@ -68,51 +68,51 @@ public class JUnitService {
 				classes[i] = loader.loadClass(suits[i]);
 				prepareClass(classes[i]);
 			}
-	
+
 			contentType = chooseContentType();
 			setLogPath();
 			alterClasses();
-			
+
 			final Result result = service.submit(new JUnitCallable(classes)).get();
-			
+
 			final List<Object> logs = new ArrayList<>();
 			for(String log : logMap.values()){
 				logs.addAll(new Gson().fromJson(new String(Files.readAllBytes(Paths.get(log))), List.class));
 			}
-		
+
 			return new JUnitServiceResponse(contentType.getContentType(), new Gson().toJson(logs) , result);
 		}
 	}
 
 	private void prepareClass(Class<?> clazz) throws Exception{
-		
+
 		if(clazz.isAnnotationPresent(Suite.SuiteClasses.class)){
 			prepareSuiteClasses(clazz);
 		}
-		
+
 		if(clazz.isAnnotationPresent(CucumberOptions.class)){
-			prepareCucumberClasses(clazz);	
+			prepareCucumberClasses(clazz);
 		}
 	}
 
 	private void prepareSuiteClasses(Class<?> clazz) throws Exception {
-		final Suite.SuiteClasses suiteClasses = (Suite.SuiteClasses) clazz.getAnnotation(Suite.SuiteClasses.class);
+		final Suite.SuiteClasses suiteClasses = clazz.getAnnotation(Suite.SuiteClasses.class);
 
 		for(Class<?> c : suiteClasses.value()){
 
 			if(c.isAnnotationPresent(CucumberOptions.class)){
-				prepareCucumberClasses(c);	
+				prepareCucumberClasses(c);
 			}
 			prepareClass(c);
 		}
 	}
 
 	private void prepareCucumberClasses(Class<?> clazz) {
-		
-		CucumberOptions cucumberOptions = (CucumberOptions) clazz.getAnnotation(CucumberOptions.class);
-		
+
+		CucumberOptions cucumberOptions = clazz.getAnnotation(CucumberOptions.class);
+
 		if(cucumberOptions.format() != null){
-			classesToChange.add(clazz);	
+			classesToChange.add(clazz);
 			appendFormats(cucumberOptions);
 		}
 	}
@@ -121,7 +121,7 @@ public class JUnitService {
 
 		Annotation newCucumberOptions;
 		for(Class<?> clazz : classesToChange){
-			newCucumberOptions = changeCucumberOptions(clazz, (CucumberOptions) clazz.getAnnotation(CucumberOptions.class));
+			newCucumberOptions = changeCucumberOptions(clazz, clazz.getAnnotation(CucumberOptions.class));
 			overrideCucumberOptions(newCucumberOptions, clazz);
 		}
 	}
@@ -185,9 +185,9 @@ public class JUnitService {
 
 		return ContentType.JSON;
 	}
-	
+
 	private void setLogPath(){
-		
+
 		for(Class<?> clazz : classesToChange){
 			logMap.put(clazz, LOG_PATH_WITHOUT_EXTENSION + clazz.getCanonicalName() + "." + contentType.getExtension());
 		}
