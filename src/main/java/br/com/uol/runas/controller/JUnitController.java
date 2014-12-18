@@ -33,29 +33,47 @@ import br.com.uol.runas.service.response.JUnitServiceResponse;
 @RestController
 public class JUnitController {
 
-	@Autowired
-	private JUnitService jUnitService;
+    @Autowired
+    private JUnitService jUnitService;
 
-	@RequestMapping("/junit/**/{suites:(?:.+\\.)+[_A-Z].+}")
-	public ResponseEntity<String> runDir(HttpServletRequest request,
-			@PathVariable("suites") String[] suites,
-			@RequestParam(required=false, value="retries") Integer retries,
-			@RequestParam(required=false, value="interval") Integer interval) throws Exception {
-		final String path = substringBetween(request.getRequestURI(), "/junit", suites[0]);
+    @RequestMapping("/junit/{protocol:[^:]*}/**/{suites:(?:.+\\.)+[_A-Z].+}")
+    public ResponseEntity<String> runAsJunitLocalFile(HttpServletRequest request,
+            @PathVariable("suites") String[] suites,
+            @RequestParam(required = false, value = "retries") Integer retries,
+            @RequestParam(required = false, value = "interval") Integer interval) throws Exception {
+        final String path = substringBetween(request.getRequestURI(), "/junit", suites[0]);
 
-		final JUnitServiceResponse response = jUnitService.runTests(path, suites);
+        return runJUnit(path, suites);
+    }
 
-		HttpStatus status;
+    @RequestMapping("/junit/{protocol:[a-z]+:}/**/{suites:(?:.+\\.)+[_A-Z].+}")
+    public ResponseEntity<String> runAsJunitRemoteFile(HttpServletRequest request,
+            @PathVariable("suites") String[] suites,
+            @RequestParam(required = false, value = "retries") Integer retries,
+            @RequestParam(required = false, value = "interval") Integer interval) throws Exception {
+        final String path = substringBetween(request.getRequestURI(), "/junit/", suites[0]);
 
-		if(response.getResult().wasSuccessful() && response.getResult().getIgnoreCount() == 0){
-			status = HttpStatus.OK;
-		}else if(response.getResult().getFailureCount() > 0){
-			status = HttpStatus.EXPECTATION_FAILED;
-		}else{
-			status = HttpStatus.PARTIAL_CONTENT;
-		}
+        return runJUnit(path, suites);
+    }
 
-		return ResponseEntity.status(status).contentType(response.getMediaType()).body(response.getLog());
-	}
+    private ResponseEntity<String> runJUnit(String path, String[] suites) throws Exception {
+        final JUnitServiceResponse response = jUnitService.runTests(path, suites);
+
+        HttpStatus status;
+
+        if (response.getResult().wasSuccessful()
+                && response.getResult().getIgnoreCount() == 0) {
+            status = HttpStatus.OK;
+        } else if (response.getResult().getFailureCount() > 0) {
+            status = HttpStatus.EXPECTATION_FAILED;
+        } else {
+            status = HttpStatus.PARTIAL_CONTENT;
+        }
+
+        return ResponseEntity
+                .status(status)
+                .contentType(response.getMediaType())
+                .body(response.getLog());
+    }
 
 }
