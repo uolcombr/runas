@@ -1,4 +1,4 @@
-package br.com.uol.runas.callable;
+package br.com.uol.runas.concurrent;
 
 import gherkin.deps.com.google.gson.Gson;
 
@@ -28,7 +28,7 @@ import br.com.uol.runas.service.response.JUnitServiceResponse;
 import cucumber.api.CucumberOptions;
 
 @SuppressWarnings("unchecked")
-public class JUnitCaller implements Callable<JUnitServiceResponse> {
+public class JUnitTask implements Callable<JUnitServiceResponse> {
 
     private final String LOG_PATH_WITHOUT_EXTENSION = "/tmp/runas/";
     private final Set<Class<?>> classesToChange = new HashSet<>();
@@ -38,7 +38,7 @@ public class JUnitCaller implements Callable<JUnitServiceResponse> {
 
     private final String[] suites;
 
-    public JUnitCaller(String[] suites) {
+    public JUnitTask(String[] suites) {
         this.suites = suites;
     }
 
@@ -62,12 +62,25 @@ public class JUnitCaller implements Callable<JUnitServiceResponse> {
         return response;
     }
 
+    //    @Override
+    //    public JUnitServiceResponse call() throws Exception {
+    //        final Class<?>[] classes = new Class[suites.length];
+    //
+    //
+    //        for (int i = 0; i < suites.length; i++) {
+    //            classes[i] = Thread.currentThread().getContextClassLoader().loadClass(suites[i]);
+    //            System.out.println(classes[i]);
+    //        }
+    //
+    //        return new JUnitServiceResponse(MediaType.APPLICATION_ATOM_XML, LOG_PATH_WITHOUT_EXTENSION, new JUnitCore().run(classes));
+    //    }
+
     private JUnitServiceResponse parse(Result result) throws Exception {
         switch (contentType) {
-            case HTML:
-                return parseHtml(result);
-            default:
-                return parseJson(result);
+        case HTML:
+            return parseHtml(result);
+        default:
+            return parseJson(result);
         }
     }
 
@@ -166,14 +179,14 @@ public class JUnitCaller implements Callable<JUnitServiceResponse> {
             for(int i = 0; i < oldFormats.length; i++){
                 extensions = oldFormats[i].split(":");
                 switch (extensions[0]) {
-                    case "json":
-                        foundTypes.add(ContentType.JSON);
-                        break;
-                    case "html":
-                        foundTypes.add(ContentType.HTML);
-                        break;
-                    default:
-                        break;
+                case "json":
+                    foundTypes.add(ContentType.JSON);
+                    break;
+                case "html":
+                    foundTypes.add(ContentType.HTML);
+                    break;
+                default:
+                    break;
                 }
             }
         }
@@ -200,5 +213,4 @@ public class JUnitCaller implements Callable<JUnitServiceResponse> {
             logMap.put(clazz, LOG_PATH_WITHOUT_EXTENSION + System.currentTimeMillis() + "." + clazz.getCanonicalName() + "." + contentType.getExtension());
         }
     }
-
 }

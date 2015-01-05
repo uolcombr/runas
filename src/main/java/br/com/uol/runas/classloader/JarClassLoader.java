@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package br.com.uol.runas.loader;
+package br.com.uol.runas.classloader;
 
 import static org.apache.commons.lang3.StringUtils.endsWithAny;
 
@@ -39,12 +39,20 @@ public class JarClassLoader extends URLClassLoader {
     public static final String JAR_PREFIX_PROTOCOL = "jar:";
     public static final String JAR_SUFIX_SPEC = "!/";
 
+    private final ClassLoaderGC classLoaderGC;
+    private JarFile jarFile;
+
     public JarClassLoader(String path) throws IOException, URISyntaxException {
+        this(path, null);
+    }
+
+    public JarClassLoader(String path, ClassLoaderGC classLoaderGC) throws IOException, URISyntaxException {
         super(new URL[0]);
+        this.classLoaderGC = classLoaderGC;
         addUrlsFromPath(path);
     }
 
-    private void addUrlsFromPath(String path) throws IOException, URISyntaxException {
+    public void addUrlsFromPath(String path) throws IOException, URISyntaxException {
         final URL rootUrl = pathToUrl(path);
 
         try {
@@ -56,9 +64,9 @@ public class JarClassLoader extends URLClassLoader {
 
     private void addUrlsFromJar(URL url) throws IOException, MalformedURLException {
         final JarURLConnection jarConnection = (JarURLConnection) url.openConnection();
-        final JarFile jar = jarConnection.getJarFile();
-        final Enumeration<JarEntry> entries = jar.entries();
-        final URL jarUrl = new File(jar.getName()).toURI().toURL();
+        jarFile = jarConnection.getJarFile();
+        final Enumeration<JarEntry> entries = jarFile.entries();
+        final URL jarUrl = new File(jarFile.getName()).toURI().toURL();
         final String base = jarUrl.toString();
 
         addURL(jarUrl);
@@ -130,5 +138,20 @@ public class JarClassLoader extends URLClassLoader {
         }
 
         return JAR_PREFIX_PROTOCOL + path + JAR_SUFIX_SPEC;
+    }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            jarFile.close();
+            jarFile = null;
+        } catch (Exception ignore) {
+        }
+
+        super.close();
+
+        if (classLoaderGC != null) {
+            classLoaderGC.collect(this);
+        }
     }
 }

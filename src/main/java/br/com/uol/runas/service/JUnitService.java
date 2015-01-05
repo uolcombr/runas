@@ -15,31 +15,36 @@
  */
 package br.com.uol.runas.service;
 
-import java.net.URLClassLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import br.com.uol.runas.callable.JUnitCaller;
-import br.com.uol.runas.factory.ThreadFactoryImpl;
-import br.com.uol.runas.loader.JarClassLoader;
+import br.com.uol.runas.classloader.ClassLoaderGC;
+import br.com.uol.runas.classloader.JarClassLoader;
+import br.com.uol.runas.concurrent.JUnitTask;
+import br.com.uol.runas.concurrent.ThreadFactoryImpl;
 import br.com.uol.runas.service.response.JUnitServiceResponse;
 
 @Service
 public class JUnitService {
 
-	public JUnitServiceResponse runTests(String path, final String[] suits) throws Exception {
+    @Autowired
+    private ClassLoaderGC classLoaderGC;
 
-		try(final URLClassLoader loader = new JarClassLoader(path)){
-			final ThreadFactory threadFactory = new ThreadFactoryImpl(loader);
-			final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
+    public JUnitServiceResponse runTests(String path, final String[] suites) throws Exception {
+        try (final JarClassLoader classLoader = new JarClassLoader(path, classLoaderGC)) {
+            final ThreadFactory threadFactory = new ThreadFactoryImpl(classLoader);
 
-			final JUnitServiceResponse jUnitServiceResponse = service.submit(new JUnitCaller(suits)).get();
-			service.shutdownNow();
+            final ExecutorService service = Executors.newSingleThreadExecutor(threadFactory);
 
-			return jUnitServiceResponse;
-		}
-	}
+            try {
+                return service.submit(new JUnitTask(suites)).get();
+            } finally {
+                service.shutdownNow();
+            }
+        }
+    }
 }
