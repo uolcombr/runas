@@ -16,33 +16,65 @@
 package br.com.uol.runas.concurrent;
 
 import java.lang.ref.WeakReference;
+import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ThreadFactoryImpl implements ThreadFactory {
 
-    private final AtomicLong threadId;
+    private static final AtomicLong THREAD_ID = new AtomicLong(0);
+    private static final AtomicLong GROUP_ID = new AtomicLong(0);
+    private final ThreadGroup threadGroup = new ThreadGroup("RunAs-Group#" + GROUP_ID.incrementAndGet());
     private final WeakReference<ClassLoader> classLoader;
 
     public ThreadFactoryImpl(ClassLoader classLoader) {
-        this.threadId = new AtomicLong(0);
         this.classLoader = new WeakReference<ClassLoader>(classLoader);
     }
 
     @Override
-    public Thread newThread(Runnable r) {
-        final Thread thread = new Thread(r, "RunAsThread-" + threadId.incrementAndGet()) {
-            @Override
-            protected void finalize() throws Throwable {
-                setContextClassLoader(null);
-                super.finalize();
-            }
-        };
+    public Thread newThread(Runnable runnable) {
+        return new ThreadOfRunAs(runnable, classLoader.get());
+    }
 
-        if (classLoader != null) {
-            thread.setContextClassLoader(classLoader.get());
+    class ThreadOfRunAs extends Thread {
+        public ThreadOfRunAs(Runnable runnable, ClassLoader classLoader) {
+            super(threadGroup, runnable, "RunAs-Thread#" + THREAD_ID.incrementAndGet());
+            setContextClassLoader(classLoader);
         }
 
-        return thread;
+        @Override
+        protected void finalize() throws Throwable {
+            stopChildrenThreads();
+            setContextClassLoader(null);
+            super.finalize();
+        }
+
+        @SuppressWarnings("deprecation")
+        private void stopChildrenThreads() {
+            try {
+                threadGroup.interrupt();
+                Thread.sleep(500);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            for (Thread thread : getAllStackTraces().keySet()) {
+                if (Objects.equals(threadGroup, thread.getThreadGroup()) && thread.isAlive()) {
+
+                    System.err.println(thread + " killed!");
+
+                    try {
+                        thread.interrupt();
+                        thread.join(100);
+                        thread.stop();
+                    } catch (Exception e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } finally {
+                        thread.setContextClassLoader(null);
+                    }
+                }
+            }
+        }
     }
 }

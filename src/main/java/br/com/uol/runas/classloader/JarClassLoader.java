@@ -40,6 +40,7 @@ public class JarClassLoader extends URLClassLoader {
     public static final String JAR_SUFIX_SPEC = "!/";
 
     private final ClassLoaderGC classLoaderGC;
+    private final String originalPath;
     private JarFile jarFile;
 
     public JarClassLoader(String path) throws IOException, URISyntaxException {
@@ -49,6 +50,7 @@ public class JarClassLoader extends URLClassLoader {
     public JarClassLoader(String path, ClassLoaderGC classLoaderGC) throws IOException, URISyntaxException {
         super(new URL[0]);
         this.classLoaderGC = classLoaderGC;
+        this.originalPath = path;
         addUrlsFromPath(path);
     }
 
@@ -153,5 +155,10 @@ public class JarClassLoader extends URLClassLoader {
         if (classLoaderGC != null) {
             classLoaderGC.collect(this);
         }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s[%s]", super.toString(), originalPath);
     }
 }
